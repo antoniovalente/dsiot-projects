@@ -1,5 +1,5 @@
 /**
- * @file RAK4631-DeepSleep-LoRaWan.ino
+ * @file MeasureAirQuality_RAK1906.ino (adapted from RAK4631-DeepSleep-LoRaWAN.ino)
  * @author original Bernd Giesecke (bernd.giesecke@rakwireless.com)
  * @author adaptated Alexandre Breda Matos (Esc. Secundária S. Pedro - Vila Real, Portugal)
  * @author adaptated Miguel Azevedo (Esc. Secundária S. Pedro - Vila Real, Portugal)
