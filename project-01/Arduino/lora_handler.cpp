@@ -1,9 +1,11 @@
 /**
    @file lora_handler.cpp
-   @author Bernd Giesecke (bernd.giesecke@rakwireless.com)
+   @author original Bernd Giesecke (bernd.giesecke@rakwireless.com)
+   @author adaptated Alexandre Breda Matos (Esc. Secundária S. Pedro - Vila Real, Portugal)
+   @author adaptated Miguel Azevedo (Esc. Secundária S. Pedro - Vila Real, Portugal)
    @brief Initialization, event handlers and task for LoRaWan
    @version 0.1
-   @date 2020-08-15
+   @date 2024-08-01
 
    @copyright Copyright (c) 2020
 
@@ -54,11 +56,15 @@ static lmh_callback_t lora_callbacks = {BoardGetBatteryLevel, BoardGetUniqueId, 
                                        };
 //  !!!! KEYS ARE MSB !!!!
 /** Device EUI required for OTAA network join */
-uint8_t nodeDeviceEUI[8] = {0x00, 0x0D, 0x75, 0xE6, 0x56, 0x4D, 0xC1, 0xF6};
+/** Enter your own keys that you got from TheThingsNetwork */
+/** The keys displayed are all reset (will not work) as an example */
+uint8_t nodeDeviceEUI[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 /** Application EUI required for network join */
-uint8_t nodeAppEUI[8] = {0x70, 0xB3, 0xD5, 0x7E, 0xD0, 0x02, 0x01, 0xE1};
+uint8_t nodeAppEUI[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 /** Application key required for network join */
-uint8_t nodeAppKey[16] = {0x2B, 0x84, 0xE0, 0xB0, 0x9B, 0x68, 0xE5, 0xCB, 0x42, 0x17, 0x6F, 0xE7, 0x53, 0xDC, 0xEE, 0x79};
+uint8_t nodeAppKey[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+
 /** Device address required for ABP network join */
 uint32_t nodeDevAddr = 0x26021FB6;
 /** Network session key required for ABP network join */
@@ -246,7 +252,7 @@ static void lorawan_confirm_class_handler(DeviceClass_t Class)
 
    @return result of send request
 */
-bool sendLoRaFrame(void)
+bool sendLoRaFrame(float Temp_bme680, float Hum_bme680, float Press_bme680, float Gas_bme680)
 {
   if (lmh_join_status_get() != LMH_SET)
   {
@@ -263,12 +269,25 @@ bool sendLoRaFrame(void)
   /// \todo here some more usefull data should be put into the package
   //******************************************************************
 
+  uint16_t t = (Temp_bme680 * 100) + 5000;
+  uint16_t h = (Hum_bme680 * 100) + 5000;
+  uint16_t p = (Press_bme680 / 100);
+  uint16_t g = (Gas_bme680 / 1000);
+
   uint8_t buffSize = 0;
-  m_lora_app_data_buffer[buffSize++] = 'H';
-  m_lora_app_data_buffer[buffSize++] = 'e';
-  m_lora_app_data_buffer[buffSize++] = 'l';
-  m_lora_app_data_buffer[buffSize++] = 'l';
-  m_lora_app_data_buffer[buffSize++] = 'o';
+  m_lora_app_data_buffer[buffSize++] = 0x01;
+  m_lora_app_data_buffer[buffSize++] = (uint8_t) (t / 256);
+  m_lora_app_data_buffer[buffSize++] = (uint8_t) (t % 256);
+  m_lora_app_data_buffer[buffSize++] = 0x02;
+  m_lora_app_data_buffer[buffSize++] = (uint8_t) (h / 256);
+  m_lora_app_data_buffer[buffSize++] = (uint8_t) (h % 256);
+  m_lora_app_data_buffer[buffSize++] = 0x03;
+  m_lora_app_data_buffer[buffSize++] = (uint8_t) (p / 256);
+  m_lora_app_data_buffer[buffSize++] = (uint8_t) (p % 256);
+  m_lora_app_data_buffer[buffSize++] = 0x04;
+  m_lora_app_data_buffer[buffSize++] = (uint8_t) (g / 256);
+  m_lora_app_data_buffer[buffSize++] = (uint8_t) (g % 256);
+
 
   m_lora_app_data.buffsize = buffSize;
 
