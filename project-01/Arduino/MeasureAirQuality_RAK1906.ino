@@ -1,11 +1,13 @@
 /**
  * @file RAK4631-DeepSleep-LoRaWan.ino
- * @author Bernd Giesecke (bernd.giesecke@rakwireless.com)
- * @brief LoRaWan deep sleep example
+ * @author original Bernd Giesecke (bernd.giesecke@rakwireless.com)
+ * @author adaptated Alexandre Breda Matos (Esc. Secundária S. Pedro - Vila Real, Portugal)
+ * @author adaptated Miguel Azevedo (Esc. Secundária S. Pedro - Vila Real, Portugal)
+ * @brief LoRaWan deep sleep example adapted to read RAK1906-BEM680 sensor
  * Device goes into sleep after successful OTAA/ABP network join.
- * Wake up every SLEEP_TIME seconds. Set time in main.h 
+ * Wake up every SLEEP_TIME seconds (Set time in main.h) and send sensor values
  * @version 0.1
- * @date 2020-09-05
+ * @date 2024-08-01
  * 
  * @copyright Copyright (c) 2020
  * 
@@ -22,6 +24,29 @@
    WB_A1      <->  P0.31/AIN7 (AnalogIn A7)
  */
 #include "main.h"
+
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME680.h> // Click to install library: http://librarymanager/All#Adafruit_BME680
+#include "bsec.h"
+
+Adafruit_BME680 bme;
+Bsec iaqSensor;
+String output;
+
+// Might need adjustments
+#define SEALEVELPRESSURE_HPA (1010.0)
+
+void bme680_init()
+{
+
+}
+
+void bme680_get()
+{
+
+}
+
 
 /** Semaphore used by events to wake up loop task */
 SemaphoreHandle_t taskEvent = NULL;
@@ -101,7 +126,7 @@ void setup(void)
 
 #ifndef MAX_SAVE
 	Serial.println("=====================================");
-	Serial.println("RAK4631 LoRaWan Deep Sleep Test");
+	Serial.println("RAK4631 LoRaWan Deep Sleep Test com BME680");
 	Serial.println("=====================================");
 #endif
 
@@ -140,6 +165,14 @@ void setup(void)
 	Serial.println("LoRaWan init success");
 #endif
 
+  Serial.begin(115200);
+  delay(1000);
+  pinMode(LED_BUILTIN, OUTPUT);
+  iaqSensor.begin(BME68X_I2C_ADDR_LOW, Wire);
+  output = "\nBSEC library version " + String(iaqSensor.version.major) + "." + String(iaqSensor.version.minor) + "." + String(iaqSensor.version.major_bugfix) + "." + String(iaqSensor.version.minor_bugfix);
+  Serial.println(output);
+  checkIaqSensorStatus();
+
 	// Take the semaphore so the loop will go to sleep until an event happens
 	xSemaphoreTake(taskEvent, 10);
 }
@@ -150,7 +183,42 @@ void setup(void)
  */
 void loop(void)
 {
-	// Switch off blue LED to show we go to sleep
+  unsigned long time_trigger = millis();
+  float Press_bme680;
+  float Gas_bme680;
+  float Temp_bme680;
+  float Hum_bme680;
+  if (iaqSensor.run()) { // If new data is available
+    digitalWrite(LED_BUILTIN, LOW);
+	// read all data
+    Press_bme680 = iaqSensor.pressure;
+    Gas_bme680 = iaqSensor.gasResistance;
+    Temp_bme680 = iaqSensor.temperature;
+    Hum_bme680 = iaqSensor.humidity;
+    digitalWrite(LED_BUILTIN, HIGH);
+  } else {
+    checkIaqSensorStatus();
+  }
+
+#ifndef MAX_SAVE
+  Serial.print("Temperature = ");
+  Serial.print(Temp_bme680);
+  Serial.println(" *C");
+
+  Serial.print("Humidity = ");
+  Serial.print(Hum_bme680);
+  Serial.println(" %");
+ 
+  Serial.print("Pressure = ");
+  Serial.print(Press_bme680 /100);
+  Serial.println(" mb");
+
+  Serial.print("Gas resistance = ");
+  Serial.print(Gas_bme680 /1000);
+  Serial.println(" kOhms");  
+#endif
+
+  // Switch off blue LED to show we go to sleep
 	digitalWrite(LED_BUILTIN, LOW);
 
 	// Sleep until we are woken up by an event
@@ -192,7 +260,7 @@ void loop(void)
 			/// \todo read sensor or whatever you need to do frequently
 
 			// Send the data package
-			if (sendLoRaFrame())
+			if (sendLoRaFrame(Temp_bme680, Hum_bme680, Press_bme680, Gas_bme680)) //Envio dos valores de Temp e Hum e Press
 			{
 #ifndef MAX_SAVE
 				Serial.println("LoRaWan package sent successfully");
@@ -217,4 +285,49 @@ void loop(void)
 		// Go back to sleep
 		xSemaphoreTake(taskEvent, 10);
 	}
+}
+
+// Helper function definitions
+void checkIaqSensorStatus(void)
+{
+  if (iaqSensor.bsecStatus != BSEC_OK) {
+    if (iaqSensor.bsecStatus < BSEC_OK) {
+      output = "BSEC error code : " + String(iaqSensor.bsecStatus);
+#ifndef MAX_SAVE
+      Serial.println(output);
+#endif
+      for (;;)
+        errLeds(); /* Halt in case of failure */
+    } else {
+      output = "BSEC warning code : " + String(iaqSensor.bsecStatus);
+#ifndef MAX_SAVE
+      Serial.println(output);
+#endif
+    }
+  }
+
+  if (iaqSensor.bme68xStatus != BME68X_OK) {
+    if (iaqSensor.bme68xStatus < BME68X_OK) {
+      output = "BME68X error code : " + String(iaqSensor.bme68xStatus);
+#ifndef MAX_SAVE
+      Serial.println(output);
+#endif
+      for (;;)
+        errLeds(); /* Halt in case of failure */
+    } else {
+      output = "BME68X warning code : " + String(iaqSensor.bme68xStatus);
+#ifndef MAX_SAVE
+      Serial.println(output);
+#endif
+    }
+  }
+}
+
+void errLeds(void)
+{
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(100);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(100);
 }
